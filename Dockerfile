@@ -21,8 +21,7 @@ WORKDIR /app
 COPY backend /app
 
 RUN composer install --no-dev --optimize-autoloader
-RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["sh", "-c", "touch database/database.sqlite && php artisan storage:link || true && php artisan migrate:fresh --force --seed || true && php artisan serve --host 0.0.0.0 --port ${PORT:-8000}"]
