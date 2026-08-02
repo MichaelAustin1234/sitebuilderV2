@@ -16,16 +16,23 @@ const PRODUCTS_KEY = 'umkm_mock_products_v2';
 
 // Helper to initialize local storage
 function initLocalStorage() {
-  if (!localStorage.getItem(TEMPLATES_KEY)) {
+  const existingTemplates = localStorage.getItem(TEMPLATES_KEY);
+  if (!existingTemplates || existingTemplates === '[]') {
     localStorage.setItem(TEMPLATES_KEY, JSON.stringify(INITIAL_MOCK_TEMPLATES));
   }
-  if (!localStorage.getItem(STORES_KEY)) {
+
+  const existingStores = localStorage.getItem(STORES_KEY);
+  if (!existingStores || existingStores === '[]') {
     localStorage.setItem(STORES_KEY, JSON.stringify(INITIAL_MOCK_STORES));
   }
-  if (!localStorage.getItem(CATEGORIES_KEY)) {
+
+  const existingCategories = localStorage.getItem(CATEGORIES_KEY);
+  if (!existingCategories || existingCategories === '[]') {
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(INITIAL_MOCK_CATEGORIES));
   }
-  if (!localStorage.getItem(PRODUCTS_KEY)) {
+
+  const existingProducts = localStorage.getItem(PRODUCTS_KEY);
+  if (!existingProducts || existingProducts === '[]') {
     localStorage.setItem(PRODUCTS_KEY, JSON.stringify(INITIAL_MOCK_PRODUCTS));
   }
 }
@@ -35,20 +42,24 @@ initLocalStorage();
 
 export const clientStorage = {
   getTemplates(): MockTemplate[] {
+    initLocalStorage();
     try {
       const data = localStorage.getItem(TEMPLATES_KEY);
-      return data ? JSON.parse(data) : INITIAL_MOCK_TEMPLATES;
+      const res = data ? JSON.parse(data) : INITIAL_MOCK_TEMPLATES;
+      return res.length ? res : INITIAL_MOCK_TEMPLATES;
     } catch {
       return INITIAL_MOCK_TEMPLATES;
     }
   },
 
   getStores(): MockToko[] {
+    initLocalStorage();
     try {
       const data = localStorage.getItem(STORES_KEY);
       const stores: MockToko[] = data ? JSON.parse(data) : INITIAL_MOCK_STORES;
+      const validStores = stores.length ? stores : INITIAL_MOCK_STORES;
       const templates = this.getTemplates();
-      return stores.map(store => ({
+      return validStores.map(store => ({
         ...store,
         template: templates.find(t => t.id === store.template_id),
       }));
@@ -172,10 +183,12 @@ export const clientStorage = {
   },
 
   getCategories(tokoId: number): MockKategori[] {
+    initLocalStorage();
     try {
       const data = localStorage.getItem(CATEGORIES_KEY);
       const categories: MockKategori[] = data ? JSON.parse(data) : INITIAL_MOCK_CATEGORIES;
-      return categories.filter(c => c.toko_id === Number(tokoId));
+      const list = categories.length ? categories : INITIAL_MOCK_CATEGORIES;
+      return list.filter(c => c.toko_id === Number(tokoId));
     } catch {
       return INITIAL_MOCK_CATEGORIES.filter(c => c.toko_id === Number(tokoId));
     }
@@ -204,12 +217,14 @@ export const clientStorage = {
   },
 
   getProducts(tokoId: number, kategoriId?: number): MockProduk[] {
+    initLocalStorage();
     try {
       const data = localStorage.getItem(PRODUCTS_KEY);
       const products: MockProduk[] = data ? JSON.parse(data) : INITIAL_MOCK_PRODUCTS;
+      const list = products.length ? products : INITIAL_MOCK_PRODUCTS;
       const categories = this.getCategories(tokoId);
 
-      let result = products.filter(p => p.toko_id === Number(tokoId));
+      let result = list.filter(p => p.toko_id === Number(tokoId));
       if (kategoriId) {
         result = result.filter(p => p.kategori_id === Number(kategoriId));
       }

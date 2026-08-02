@@ -35,7 +35,7 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Try real network fetch first if configured
+  // Try real network fetch first if backend is available
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
@@ -43,6 +43,12 @@ export async function apiFetch<T>(
     });
 
     const data = await response.json().catch(() => ({}));
+
+    // If server responded with 5xx or server error / bad gateway, fallback to client data engine
+    if (response.status >= 500) {
+      console.warn(`[Client-Data Engine] Server returned ${response.status}. Falling back to local data store.`);
+      return handleClientStorageFallback<T>(endpoint, options);
+    }
 
     if (!response.ok) {
       const errorData = data as ApiErrorResponse;
@@ -52,12 +58,12 @@ export async function apiFetch<T>(
 
     return data as T;
   } catch (err: any) {
-    // If it's an explicit ApiError from backend server, rethrow it
-    if (err instanceof ApiError) {
+    // If it's an explicit 4xx ApiError from a healthy backend, rethrow it
+    if (err instanceof ApiError && err.status < 500) {
       throw err;
     }
 
-    // Otherwise (Network Error / Failed to fetch / CORS / Server Down), fallback to Client Storage
+    // Otherwise (Network Error / 502 Bad Gateway / CORS / Server Down), fallback to Client Data Engine
     console.warn(`[Client-Data Engine] Network fetch failed for ${endpoint}. Falling back to local data store.`);
     return handleClientStorageFallback<T>(endpoint, options);
   }
