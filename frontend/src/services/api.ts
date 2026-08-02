@@ -35,16 +35,22 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Try real network fetch first if backend is available
+  // 1. Fast Timeout AbortController (1.5 seconds max) to prevent network hanging
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 1500);
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     const data = await response.json().catch(() => ({}));
 
-    // If server responded with 5xx or server error / bad gateway, fallback to client data engine
+    // If server responded with 5xx or server error / bad gateway, fallback instantly
     if (response.status >= 500) {
       console.warn(`[Client-Data Engine] Server returned ${response.status}. Falling back to local data store.`);
       return handleClientStorageFallback<T>(endpoint, options);
@@ -58,13 +64,15 @@ export async function apiFetch<T>(
 
     return data as T;
   } catch (err: any) {
+    clearTimeout(timeoutId);
+
     // If it's an explicit 4xx ApiError from a healthy backend, rethrow it
     if (err instanceof ApiError && err.status < 500) {
       throw err;
     }
 
-    // Otherwise (Network Error / 502 Bad Gateway / CORS / Server Down), fallback to Client Data Engine
-    console.warn(`[Client-Data Engine] Network fetch failed for ${endpoint}. Falling back to local data store.`);
+    // Otherwise (Timeout / Abort / Network Error / 502 / Server Down), fallback instantly to Client Engine
+    console.warn(`[Client-Data Engine] Network fetch failed or timed out for ${endpoint}. Falling back to local data store.`);
     return handleClientStorageFallback<T>(endpoint, options);
   }
 }
