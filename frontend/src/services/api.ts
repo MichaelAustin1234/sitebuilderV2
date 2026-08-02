@@ -35,7 +35,7 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // 1. Fast Timeout AbortController (1.5 seconds max) to prevent network hanging
+  // Fast AbortController (1.5s max) to prevent network hanging when backend is offline
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 1500);
 
@@ -105,12 +105,13 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
 
   // Templates
   if (url === '/templates' && method === 'GET') {
-    return { data: clientStorage.getTemplates() } as unknown as T;
+    return { data: clientStorage.getTemplates(), templates: clientStorage.getTemplates() } as unknown as T;
   }
 
-  // User Stores List
-  if (url === '/toko' && method === 'GET') {
-    return { data: clientStorage.getStores() } as unknown as T;
+  // User Stores List: /toko or /my-toko
+  if ((url === '/toko' || url === '/my-toko') && method === 'GET') {
+    const stores = clientStorage.getStores();
+    return { tokos: stores, data: stores } as unknown as T;
   }
 
   // Create Store
@@ -120,7 +121,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
       bodyData = typeof options.body === 'string' ? JSON.parse(options.body) : {};
     }
     const store = clientStorage.createStore(bodyData);
-    return { data: store, message: 'Toko berhasil dibuat' } as unknown as T;
+    return { toko: store, data: store, message: 'Toko berhasil dibuat' } as unknown as T;
   }
 
   // Public Store Detail by Slug: /public/toko/{slug}
@@ -131,7 +132,12 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
     if (!store) {
       throw new ApiError(404, 'Toko tidak ditemukan.');
     }
-    return { data: store } as unknown as T;
+    const fullStoreData = {
+      ...store,
+      kategoris: store.kategori || [],
+      produks: store.produk || [],
+    };
+    return { toko: fullStoreData, data: fullStoreData } as unknown as T;
   }
 
   // Public Store Products: /public/toko/{slug}/produk
@@ -140,10 +146,10 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
     const slug = publicProductsMatch[1];
     const store = clientStorage.getStoreBySlug(slug);
     if (!store) {
-      return { data: [] } as unknown as T;
+      return { produks: [], data: [] } as unknown as T;
     }
     const products = clientStorage.getProducts(store.id);
-    return { data: products } as unknown as T;
+    return { produks: products, data: products } as unknown as T;
   }
 
   // Store Customization: /toko/{id}/customization
@@ -159,7 +165,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
       bodyData = JSON.parse(options.body);
     }
     const updated = clientStorage.updateStoreCustomization(id, bodyData);
-    return { data: updated, message: 'Kustomisasi toko berhasil disimpan' } as unknown as T;
+    return { toko: updated, data: updated, message: 'Kustomisasi toko berhasil disimpan' } as unknown as T;
   }
 
   // Publish Store: /toko/{id}/publish
@@ -167,7 +173,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
   if (publishMatch && method === 'POST') {
     const id = Number(publishMatch[1]);
     const published = clientStorage.publishStore(id);
-    return { data: published, message: 'Toko berhasil diterbitkan' } as unknown as T;
+    return { toko: published, data: published, message: 'Toko berhasil diterbitkan' } as unknown as T;
   }
 
   // Store Products List: /toko/{id}/produk
@@ -175,7 +181,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
   if (storeProductsMatch && method === 'GET') {
     const id = Number(storeProductsMatch[1]);
     const products = clientStorage.getProducts(id);
-    return { data: products } as unknown as T;
+    return { produks: products, data: products } as unknown as T;
   }
 
   // Create Product: /toko/{id}/produk
@@ -190,7 +196,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
       bodyData = JSON.parse(options.body);
     }
     const newProduct = clientStorage.createProduct(id, bodyData);
-    return { data: newProduct, message: 'Produk berhasil ditambahkan' } as unknown as T;
+    return { produk: newProduct, data: newProduct, message: 'Produk berhasil ditambahkan' } as unknown as T;
   }
 
   // Update Product: /toko/{id}/produk/{productId}
@@ -207,7 +213,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
       bodyData = JSON.parse(options.body);
     }
     const updated = clientStorage.updateProduct(tokoId, productId, bodyData);
-    return { data: updated, message: 'Produk berhasil diperbarui' } as unknown as T;
+    return { produk: updated, data: updated, message: 'Produk berhasil diperbarui' } as unknown as T;
   }
 
   // Delete Product: /toko/{id}/produk/{productId}
@@ -222,7 +228,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
   if (storeCategoriesMatch && method === 'GET') {
     const id = Number(storeCategoriesMatch[1]);
     const categories = clientStorage.getCategories(id);
-    return { data: categories } as unknown as T;
+    return { kategoris: categories, data: categories } as unknown as T;
   }
 
   // Create Category: /toko/{id}/kategori
@@ -233,7 +239,7 @@ function handleClientStorageFallback<T>(endpoint: string, options: RequestInit):
       bodyData = JSON.parse(options.body);
     }
     const newCat = clientStorage.createCategory(id, bodyData.nama || 'Kategori Baru');
-    return { data: newCat, message: 'Kategori berhasil ditambahkan' } as unknown as T;
+    return { kategori: newCat, data: newCat, message: 'Kategori berhasil ditambahkan' } as unknown as T;
   }
 
   // Delete Category: /toko/{id}/kategori/{catId}
